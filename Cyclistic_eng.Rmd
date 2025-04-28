@@ -1,0 +1,693 @@
+---
+title: "Analyzing data on bicycle rental"
+author: "Kolomiiets Ruslan"
+date: "2025-03-20"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+editor_options:
+  markdown:
+    wrap: sentence
+---
+
+# Case study "Cyclistic"
+
+Cyclistic has 692 bike sharing stations across Chicago. The bikes can be unlocked from one station and returned to any other station in the system at any time. Customers who buy single-ride or full-day passes are called casual users. Customers who purchase annual passes are called Cyclistic members. 
+
+Cyclistic's financial analysts have concluded that annual passes are much more profitable than occasional ones. Instead of creating a marketing campaign aimed at new customers, there is a good opportunity to turn casual cyclists into club members. To do this, it is necessary to develop marketing strategies aimed at converting casual cyclists into annual members. To do so, however, the team needed to better understand the differences between annual members and casual users, why casual users purchase memberships, and how digital media can impact their marketing tactics. 
+
+
+Outline of the report:
+
+1.  Terms of reference
+
+2.  Formulation of the business task
+
+3.  Description of all used data sources
+
+4.  Documentation of any data cleaning or manipulation
+
+5.  A summary of the analysis
+
+6.  Key conclusions
+
+7.  Recommendations based on the analysis
+
+
+# 1. Statement of Work
+
+**Purpose:** the project was developed as part of the educational process at the [Google Data Analytics Professional Certificate](https://www.coursera.org/professional-certificates/google-data-analytics).
+
+**Data Analyst:** Ruslan Kolomiets
+
+**Client:** Cyclistic - bike-share company
+
+**Research objective:** Do annual members and casual riders use Cyclistic bikes differently? 
+
+
+## Scope / Major Project Activities:
+
+**Data collection** obtain data tables, clean them and prepare for the study
+
+**Search for dependencies** analyze parameters and find trends in the data
+
+**Make forecasting** build a forecast for the changed growth parameters 
+
+**Provide research conclusions** draw and communicate conclusions on the research conducted
+
+
+## This project does not include:
+
+* research beyond the scope of the ToR
+
+* conclusions and forecasts that are not included in the task description
+
+* complex statistical calculations
+
+
+# 2. Formulation of the business task
+
+The management of Cyclistic has asked us to answer the following question: What is the difference in bike usage between annual users and occasional customers?
+
+## Task statement:
+
+Using the existing data, it is necessary to analyze users, determine their characteristics, preferences, and find out their behavioral trends.
+
+We define the criteria by which users can be evaluated.
+
+-   **user type** - _Subscriber, Customer_
+-   **user age**
+-   **user gender** - _Male, Female_
+-   **duration of the trip**
+-   **type of trip** - _in one direction (one_way) or with a return to the starting docking stations (return)_
+-   **type of day of the week** - _weekdays, working days, (holidays of the week - no information is available)_
+-   **times of day**
+-   **months of the year**
+
+
+# 3. Description of data and sources used
+
+**Data used:** Divvy data, Divvy's accumulated travel data, is for public use. The data is provided in accordance with the Divvy Data License Agreement, [license agreement.](https://divvybikes.com/data-license-agreement).
+
+The data is reliable, does not have any confidential information, and does not pose any risks in terms of data security. 
+
+The data covers the period of 2019, consists of four csv files containing data on a quarterly basis.
+
+The data in the files consists of the following columns:
+
+**trip_id** - _a unique trip identifier_
+
+**start_time** - _day and time of the trip start (M/d/yyyy hh:mm)_
+
+**end_time** _- _day and time of the trip end (M/d/yyyy hh:mm)_
+
+**bikeid** - _bike identification number_
+
+**tripduration** - _duration of the trip_
+
+**from_station_id** - _unique docking stations identifier_
+
+**from_station_name** - _the name of the docking stations where the trip started_
+
+**to_station_id** - _unique docking stations identifier_
+
+**to_station_name** - _the name of the docking stations where the trip ended_
+
+**usertype** - _type of user (user with a subscription, random user)_
+
+**gender** - _user's gender_
+
+**birthyear** - _the year of birth of the user_
+
+Columns created for convenience in the data preparation process:
+
+**d_2019$age** - _user's age_
+
+**d_2019$tripduration_min** - _trip duration in minutes_
+
+**d_2019$trip_type** - _type of trip, one way or return_
+
+**d_2019$day_type** - _determining the type of day: day off or working day_
+
+**d_2019$age_group** - _age groups_
+
+
+# 4. Cleaning and manipulating data
+
+Make a backup copy of all files beforehand. 
+
+To work with data in the R environment, download the following libraries:
+
+```{r librarys, message=FALSE, warning=FALSE}
+library(tidyverse) # a set of packages for data processing in R 
+library(dplyr) # for working with dataframes 
+library(readr) # for working with CSV and text files 
+library(lubridate) # for working with dates and times 
+library(ggplot2) # for data visualization 
+library(scales) # to change the format of axis labels
+```
+
+Import files:
+
+```{r Import, message=FALSE, warning=FALSE}
+d_2019_q1 <- read_csv("D:/Google Data Analytics/! Cyclistic/Divvy_Trips_2019_Q1.csv") 
+d_2019_q2 <- read_csv("D:/Google Data Analytics/! Cyclistic/Divvy_Trips_2019_Q2.csv") 
+d_2019_q3 <- read_csv("D:/Google Data Analytics/! Cyclistic/Divvy_Trips_2019_Q3.csv") 
+d_2019_q4 <- read_csv("D:/Google Data Analytics/! Cyclistic/Divvy_Trips_2019_Q4.csv")
+```
+
+Familiarize yourself with the data structure in each table:
+
+```{r Table structure, message=FALSE, warning=FALSE}
+glimpse(d_2019_q1)
+glimpse(d_2019_q2)
+glimpse(d_2019_q3)
+glimpse(d_2019_q4)
+```
+
+### Verify data
+
+One of the tables has a common structure, but it has different column names from the others. Let's change them to match the other tables:
+
+```{r Renaming, message=FALSE, warning=FALSE,}
+colnames(d_2019_q2) <- colnames(d_2019_q1)
+```
+
+Combine all tables:
+
+```{r Combine, message=FALSE, warning=FALSE}
+d_2019 <- rbind(d_2019_q1, d_2019_q2, d_2019_q3, d_2019_q4)
+```
+
+We check for duplicates:
+
+```{r Dupl, message=FALSE, warning=FALSE}
+nrow(d_2019[duplicated(d_2019), ])
+```
+
+We check for uniqueness of values in columns of the <character> type that are important for calculations:
+
+```{r Check char, message=FALSE, warning=FALSE}
+unique(d_2019$gender)
+unique(d_2019$usertype)
+```
+Check for extra spaces in station names:
+
+```{r Check for spaces, message=FALSE, warning=FALSE}
+d_2019[grepl("^\\s|\\s$", d_2019$from_station_name) | # check for extra spaces at the beginning and end
+       grepl("^\\s|\\s$", d_2019$to_station_name) |
+       grepl("  ", d_2019$from_station_name) | # check for double spaces  
+       grepl("  ", d_2019$to_station_name), ]
+```
+Check the dates for the sequence of events:
+
+```{r date correct, message=FALSE, warning=FALSE}
+d_2019[d_2019$start_time > d_2019$end_time, ] # find trips where the departure time is greater than the arrival time
+```
+
+delete data with incorrect dates:
+
+```{r date del, message=FALSE, warning=FALSE}
+d_2019 <- d_2019 %>%
+  filter(start_time <= end_time)
+```
+
+To detect errors, we get generalized statistics on the data:
+
+```{r Statystic, message=FALSE, warning=FALSE}
+summary(d_2019)
+```
+
+We observe the following:
+
+* in the **tripduration** column, the maximum trip duration is 10628400 seconds, which looks like erroneous data
+
+* in the **birthyear** column, the minimum year of birth is 1759, which is also erroneous
+
+Check for missing data (NA)
+
+```{r Check NA, message=FALSE, warning=FALSE}
+colSums(is.na(d_2019))
+```
+
+**The gender and birthyear columns have a significant amount of missing data**.
+
+Count the number of blanks in the **gender** and **birthyear** columns for users of type **Customer**:
+
+```{r customer NA, message=FALSE, warning=FALSE,}
+data.frame(
+  metric = c("NA in gender", "NA in birthyear", "Total Customers"),
+  value = c(
+    sum(is.na(d_2019$gender[d_2019$usertype == "Customer"])),
+    sum(is.na(d_2019$birthyear[d_2019$usertype == "Customer"])),
+    sum(d_2019$usertype == "Customer")
+  )
+)
+```
+
+559206 - number of spaces for all users in the variable **gender**  
+538751 - the number of spaces for all users in the variable **birthyear** 
+
+Almost all of the data with gaps belongs to the **Customer** type. We leave this data, as it makes up the majority of the Customer type data and contains a significant amount of information about the duration of the trip.
+
+At previous stages of calculations, significant errors were found in the data on trip duration and date of birth:
+
+for **tripduration**:
+
+Min:              61
+Median :         709
+Max:        10628400
+
+for *birthyear**:
+
+Min. :          1759
+Median :        1987
+Max. :          2014
+
+
+It is necessary to remove erroneous data, but first you need to determine the limit along which the filtering will be performed and make sure that the data will not be distorted after removal. To do this, let's assume that the maximum age of cyclists can be 80 years old and the duration of the trip is 12 hours. Let's test this assumption:
+
+```{r limit, message=FALSE, warning=FALSE}
+sum(!is.na(d_2019$birthyear) & d_2019$birthyear < 1939) # number of rows with age value > 80 years, (1939 year of birth)
+sum(d_2019$tripduration > 43200) # number of lines with a trip duration > 43200 seconds (12 hours)
+nrow(d_2019) # total number of observations
+```
+
+The percentage of false information is less than 0.1%, so we can ignore this information.
+
+Filter out false data:
+
+```{r filtering, message=FALSE, warning=FALSE}
+d_2019 <- d_2019 %>% filter(birthyear >= 1939 | is.na(birthyear))
+d_2019 <- d_2019 %>% filter(tripduration <= 43200)
+```
+
+For convenience, we create additional calculation columns:
+
+```{r Additional columns, message=FALSE, warning=FALSE}
+d_2019$tripduration_min <- round(d_2019$tripduration / 60)  # conversion of trip duration to minutes
+d_2019$age <- year(d_2019$start_time) - d_2019$birthyear  # calculate the user's age
+d_2019$trip_type <- ifelse(d_2019$from_station_id == d_2019$to_station_id, "return", "one_way") # determining the type of trip
+d_2019 <- d_2019 %>%
+  mutate(day_type = ifelse(wday(start_time) %in% c(1, 7), "Weekend", "Weekday")) # defining the type of day
+colnames(d_2019)
+```
+
+
+### Analyzing the age characteristics of users
+
+Draw a graph of the distribution of user activity by age for customers.
+
+```{r customers by age, message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+ggplot(data = d_2019 %>% filter(usertype == "Customer")) + 
+  geom_bar(mapping = aes(x = age), fill = "lightblue") +
+  labs(title = "Distribution of customers by age") +
+  theme_minimal()
+```
+
+We build a graph of the distribution of user activity by age for subscribers.
+
+```{r subscribers by age, message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+ggplot(data = d_2019 %>% filter(usertype == "Subscriber")) + 
+  geom_bar(mapping = aes(x = age), fill = "#4e79a6") +
+  labs(title = "Distribution of subscribers by age") +
+  theme_minimal()
+```
+
+We observe that **customers have a shift towards younger age**.
+
+Let's calculate the main static indicators for each type of user:
+
+```{r Customer, message=FALSE, warning=FALSE}
+  customer_summary <- summary(d_2019 %>% filter(usertype == "Customer", !is.na(age)) %>% select(age))
+  subscriber_summary <- summary(d_2019 %>% filter(usertype == "Subscriber", !is.na(age)) %>% select(age))
+tibble(
+  Statistic = names(customer_summary),
+  Customer = as.vector(customer_summary),
+  Subscriber = as.vector(subscriber_summary)
+)
+```
+
+Since the distribution of users is skewed, we use median values to determine the average age more accurately:
+
+**The average age of customers is 28 years old, while the average age of subscribers is 32 years old**
+
+For the convenience of calculations, we will divide the age of users into groups:
+
+```{r Age_group}
+d_2019 <- d_2019 %>%
+  mutate(age_group = cut(age, breaks = seq(0, 80, by = 10), 
+                        labels = c("under 10", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70+"), ))
+```
+
+For each age group, we calculate the percentage of users:
+
+```{r Percent of customer, message=FALSE, warning=FALSE}
+d_2019 %>% filter(!is.na(age_group)) %>%
+  group_by(age_group) %>%
+  summarise(
+    customer_percentage = round((sum(usertype == "Customer") / n()) * 100, 0),  # Percent of customer
+    subscriber_percentage = round((sum(usertype == "Subscriber") / n()) * 100, 0) # Percent of subscriber
+  )
+```
+
+**We observe a tendency for the percentage of users without a subscription to decrease with age, and the opposite trend for customers**
+
+### Let's analyze the behavior of users with different genders.
+
+We build a graph of the distribution of all users by age group for different genders:
+
+```{r Distribution for genders, message=FALSE, warning=FALSE, fig.width=8, fig.height=8}
+ggplot(data = d_2019 %>% filter(usertype == "Customer", !is.na(gender))) + 
+  geom_bar(mapping = aes(x = age, fill = gender)) +  # fill depends on gender
+  facet_wrap(~gender, ncol = 1) + 
+  scale_fill_manual(values = c("Male" = "lightblue", "Female" = "pink")) +
+  scale_y_continuous(labels = label_number(scale = 1e-3))+
+  labs(title = "Distribution of customers by age for different genders", y = "Count (thousands)") +
+  theme_minimal()
+```
+
+The visualization shows that the age distribution among customer is similar for different genders.
+**There is a uniform excess of males over females**.
+
+We calculate the percentage of women and men for each age group among customer:
+
+```{r Відсоток жінок Customer, message=FALSE, warning=FALSE}
+d_2019 %>% filter(usertype == "Customer", !is.na(age_group)) %>% 
+  group_by(age_group) %>%
+  summarise(
+    Female = round((sum(gender == "Female", na.rm = TRUE) / sum(!is.na(gender))) * 100),
+    Male   = round((sum(gender == "Male", na.rm = TRUE) / sum(!is.na(gender))) * 100)
+            ) 
+```
+
+Let's calculate the percentage of women and men for each age group among subscribers:
+
+```{r percentage of women Subscriberr, message=FALSE, warning=FALSE}
+d_2019 %>% filter(usertype == "Subscriber", !is.na(gender)) %>% 
+  group_by(age_group) %>%
+  summarise(Female = round((sum(gender == "Female", na.rm = TRUE) / sum(!is.na(gender))) * 100),
+            Male = round((sum(gender == "Male", na.rm = TRUE) / sum(!is.na(gender))) * 100)
+            ) 
+```
+
+**For both types of users, we observe a tendency for the share of women to decrease with increasing age**.
+
+Let's calculate the percentage of women for each type of user:
+
+```{r percentage of women, message=FALSE, warning=FALSE}
+d_2019 %>% group_by(usertype) %>%  
+  summarise(
+    percent_female = round(100 * sum(gender == "Female", na.rm = TRUE) / sum(!is.na(gender))),
+    percent_male = round(100 * sum(gender == "Male", na.rm = TRUE) / sum(!is.na(gender)))        
+            )
+```
+
+**We observe a trend of a decrease in the percentage of women among users.**
+
+Let's visualize the distribution of users by trip duration:
+
+```{r Distribution by duration, message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+ggplot(data = d_2019) + 
+  geom_bar(mapping = aes(x = tripduration_min), fill = "lightblue") +
+  labs(title = "Distribution of users by trip duration (min)") +
+  theme_minimal()
+```
+
+We observe that the most trips last less than 180 minutes. For clarity and ease of evaluation, we will limit the duration to this value and build clarifying visualizations.
+
+Let's build a distribution by trip duration separately for different types of users::
+
+```{r Customer distribution, message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+ggplot(data = d_2019 %>% filter(tripduration_min < 180 & usertype == "Customer")) + 
+  geom_bar(mapping = aes(x = tripduration_min), fill = "lightblue") +
+  labs(title = "Distribution of customer by trip duration (min)") +
+  theme_minimal()
+```
+
+```{r subscribers by trip duration, message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+ggplot(data = d_2019 %>% filter(tripduration_min < 180 & usertype == "Subscriber")) + 
+  geom_bar(mapping = aes(x = tripduration_min), fill = "#4e79a6") +
+  labs(title = "Distribution of subscribers by trip duration (min)") +
+  theme_minimal()
+```
+
+We observe that **a significant number of customers have long trips, and almost all subscribers have only short trips**.
+
+Let's calculate the percentage of customers who have a trip duration longer than 30 minutes:
+
+```{r Percentage of long trips, message=FALSE, warning=FALSE}
+d_2019 %>%
+  group_by(usertype) %>%
+  summarise(percent_long_trips = round(100 * sum(tripduration_min > 30) / sum(!is.na(tripduration_min))))
+```
+
+We observe that **trips longer than 30 minutes are made by 40% of customers without a subscription and only 5% of customers with a subscription**. 
+
+Let's calculate the main static indicators of the trip duration for each type of user:
+
+```{r Customer statist, message=FALSE, warning=FALSE}
+summary(d_2019 %>% 
+          filter(usertype == "Customer") %>%
+          select(tripduration_min))
+```
+
+```{r Subscriber statist, message=FALSE, warning=FALSE}
+summary(d_2019 %>%
+          filter(usertype == "Subscriber") %>%
+          select(tripduration_min))
+```
+
+**The average trip duration for users without a subscription is 26 minutes, for users with a subscription 10 minutes**.
+
+
+### Let's analyze user behavior in terms of trip type
+
+Let's calculate how different types of users use the service:
+
+```{r distribution by type of trip, message=FALSE, warning=FALSE}
+d_2019 %>% group_by(usertype) %>%  
+  summarise(
+    percent_one_way = round(100 * sum(trip_type == "one_way") / n()),
+    percent_return = round(100 * sum(trip_type == "return") / n())
+    )
+```
+
+We observe that **both types of users are more likely to use bicycles for trips in the same direction, i.e., there are no significant differences**. In the context of this study, this information will be considered insignificant.
+
+
+### Let's analyze user behavior on weekdays and weekends.
+
+Let's calculate the ratios of activities of different types of users:
+
+```{r distribution by day, message=FALSE, warning=FALSE}
+d_2019 %>% 
+  group_by(usertype) %>%  
+  summarise(
+    percent_weekday = round(100 * sum(day_type == "Weekday", na.rm = TRUE) / n()),
+    percent_weekend = round(100 * sum(day_type == "Weekend", na.rm = TRUE) / n())
+  )
+```
+
+We observe that **customers have a slight overlap in using the service on weekdays. 80% of subscribers use the service on weekdays**.
+
+
+### Let's analyze user behavior throughout the day.
+
+Let's build a graph of customer activity during the day for weekends:
+
+```{r weekend Customer, fig.width=8, fig.height=4}
+ggplot(data = d_2019 %>% filter(usertype == "Customer" & day_type == "Weekend")) +
+  geom_histogram(mapping = aes(x = hour(start_time)), 
+                 bins = 24, fill = "lightblue", color = "grey") +
+   scale_x_continuous(breaks = 0:24) +
+  labs(title = "Activity customers on weekends",
+       x = "Hours of the day") +
+  theme_minimal()
+```
+
+Let's build a graph of subscriber activity during the day for weekends:
+
+```{r weekend Subscriber, fig.width=8, fig.height=4}
+ggplot(data = d_2019 %>% filter(usertype == "Subscriber" & day_type == "Weekend")) +
+  geom_histogram(mapping = aes(x = hour(start_time)), 
+                 bins = 24, fill = "#4e79a6", color = "grey") +
+   scale_x_continuous(breaks = 0:24) +
+  labs(title = "Activity subscribers on weekends",
+       x = "Hours of the day") + 
+  theme_minimal()
+```
+
+**We observe a slow increase in activity until lunchtime, followed by a slow decline for both types of users.**
+
+Let's build a graph of customer activity for working days of the week:
+
+```{r weekday Customer, fig.width=8, fig.height=4}
+ggplot(data = d_2019 %>% filter(usertype == "Customer" & day_type == "Weekday")) +
+  geom_histogram(mapping = aes(x = hour(start_time)), 
+                 bins = 24, fill = "lightblue", color = "grey") +
+  scale_x_continuous(breaks = 0:24) +
+  labs(title = "Activity customers on weekdays",
+       x = "Hours of the day") +
+  theme_minimal()
+```
+
+Let's build a graph of subscriber activity for weekdays:
+
+```{r weekday subscriber, fig.width=8, fig.height=4}
+ggplot(data = d_2019 %>% filter(usertype == "Subscriber" & day_type == "Weekday")) +
+  geom_histogram(mapping = aes(x = hour(start_time)), 
+                 bins = 24, fill = "#4e79a6", color = "grey") +
+  scale_x_continuous(breaks = 0:24) +
+  labs(title = "Activity subscriber on weekdays",
+       x = "Hours of the day") +
+  theme_minimal()
+```
+
+**Significant differences were found. For customers, we see a trend of increasing the number of users on weekdays from 6 to 18 hours, with maximum activity around 5 pm. On the other hand, subscribers have two peaks from 7 to 10 pm and from 4 to 8 pm, with a decline in the afternoon**.
+
+### Let's analyze user behavior throughout the year
+
+We will build an activity graph for customer:
+
+```{r year Customer, fig.width=8, fig.height=4}
+ggplot(data = d_2019 %>% filter(usertype == "Customer")) +
+  geom_histogram(mapping = aes(x = month(start_time)), 
+                 bins = 12, fill = "lightblue", color = "grey") +
+  scale_x_continuous(breaks = 1:12) +
+  labs(title = "Subscriber activity during the year",
+       x = "Months of the year") +
+  theme_minimal()
+```
+
+Let's build an activity graph for subscribers:
+
+```{r year Subscriber, fig.width=8, fig.height=4}
+ggplot(data = d_2019 %>% filter(usertype == "Subscriber")) +
+  geom_histogram(mapping = aes(x = month(start_time)), 
+                 bins = 12, fill = "lightblue", color = "grey") +
+  scale_x_continuous(breaks = 1:12) +
+  scale_y_continuous(labels = label_number(scale = 1e-3))+
+  labs(title = "Subscriber activity during the year",
+       x = "Months of the year",
+       y = "Count (thousands)") +
+  theme_minimal()
+```
+
+We observe **a compressed form of the distribution of customers. The main activity falls on the period from late spring to early fall, with the maximum indicators in August. Subscribers have a stretched distribution, with no breaks in activity in winter.**
+
+We will determine the list of docking stations that are in the highest demand among customers during the periods of highest activity. Let's do this separately for a long-term marketing campaign, such as billboards, and consider the most active months, and separately for short-term campaigns, such as flyer distribution, etc.
+We calculate the most popular 10 docking stations for the period from June to October:
+
+```{r top 10, fig.width=8, fig.height=4}
+d_2019 %>%
+  filter(usertype == "Customer" & 
+         start_time >= as.Date("2019-06-01") & 
+         start_time <= as.Date("2019-10-31")) %>%
+  group_by(from_station_name) %>%
+  summarise(total_trips = n()) %>%
+  arrange(desc(total_trips)) %>%
+  head(10)
+```
+
+We calculate the 10 most popular docking stations for the period from June to October for weekdays:
+
+```{r top 10 weekday, message=FALSE, warning=FALSE}
+d_2019 %>%
+  filter(usertype == "Customer" & 
+         start_time >= as.Date("2019-06-01") & 
+         start_time <= as.Date("2019-10-31") & 
+         day_type == "Weekday" &
+         hour(start_time) >= 11 & 
+         hour(start_time) <= 20) %>%
+  group_by(from_station_name) %>%
+  summarise(total_trips = n()) %>%
+  arrange(desc(total_trips)) %>%
+  head(10)
+```
+
+We calculate the 10 most popular docking stations for the period from June to October for weekends:
+
+```{r top 10 weekend, message=FALSE, warning=FALSE}
+d_2019 %>%
+  filter(usertype == "Customer" & 
+         start_time >= as.Date("2019-06-01") & 
+         start_time <= as.Date("2019-10-31") & 
+         day_type == "Weekend" &
+         hour(start_time) >= 10 & 
+         hour(start_time) <= 17) %>%
+  group_by(from_station_name) %>%
+  summarise(total_trips = n()) %>%
+  arrange(desc(total_trips)) %>%
+  head(10)
+```
+
+We observe that the most popular docking stations differ slightly from day to day, but they do differ.
+Export the file to build the dashboard:
+
+```{r export}
+write.csv(d_2019, "D:/Google Data Analytics/! Cyclistic/d_2019_exp.csv", row.names = FALSE)
+
+```
+
+
+
+# 5. Summary of the Analysis
+ 
+ 
+### Preliminary Remarks
+
+During the analysis, the behavior and characteristics of different types of users were examined.
+
+The age and gender characteristics of the users, the dynamics of their behavior, and trends were identified.
+
+No complex statistical calculations were conducted in this study.
+
+For a more detailed and objective analysis, customer IDs are needed to identify multiple uses of the service. This would allow for identifying users more likely to transition to a subscription, as well as excluding one-time uses of the service, such as tourist trips, one-time walks, or other incidental uses.
+
+### Information Obtained During the Analysis
+
+The average age of users without a subscription is 28 years, while the average age of subscribers is 32 years. This indicates a shift towards a younger age group among users without a subscription. The service is most popular among users aged 19 to 36 for non-subscribers and between 24 and 42 for subscribers.
+
+In both user types, the number of men outweighs the number of women. There is an imbalance that tends to increase evenly with each successive age group.
+
+The percentage of women among non-subscribers (38%) is higher than among subscribers (25%).
+
+Long trips (> 30 minutes) are made by 40% of non-subscribers and only 5% of subscribers. 
+
+The average trip duration for non-subscribers is 23 minutes, while for subscribers, it is 10 minutes.
+
+Non-subscribers use the service more frequently on weekends, while subscribers tend to use it more on weekdays.
+
+The behavior of both user types on weekends is similar: activity gradually increases from the morning until lunchtime, then slowly decreases in the evening.
+
+On weekdays, there is a significant difference: non-subscribers exhibit behavior similar to weekends, while subscribers have two peaks of activity – from 7:00 to 10:00 and from 16:00 to 20:00.
+
+The activity of non-subscribers throughout the year is uneven: there is a pause in the winter period, with the main activity occurring from late spring to early autumn. Subscribers are active year-round, with a gradual increase in activity, a peak in August, and a subsequent slow decline.
+
+The most popular stations during the most active periods have been identified.
+
+
+# 6. Key Findings
+
+The most active segment of non-subscribers is several years younger than the most active segment of subscribers.
+
+A significant portion of non-subscribers uses the service mainly in spring, summer, and autumn, while subscribers use it year-round.
+
+Non-subscribers take longer trips than subscribers.
+
+On weekdays, subscribers mainly use the service during peak hours (morning and evening), while on weekends, they use it throughout the day, with more activity at lunchtime. The activity of non-subscribers on weekdays is almost identical to their weekend activity, gradually increasing from morning to lunchtime, and then gradually decreasing in the evening, just like subscribers on weekends.
+
+Non-subscribers use the service more frequently on weekends, while subscribers use it more often on weekdays.
+
+
+# 7. Top Recommendations Based on Your Analysis
+
+
+Given that non-subscriber clients take longer trips, periodic SMS or email campaigns can be conducted, offering a promotion that increases the trip duration limit on weekends during the active season when purchasing an annual subscription.
+
+Develop a program to ensure that the most popular stations are adequately supplied with bicycles on days of high demand.
+
+Increase the percentage of bicycles that are more suitable for women.
+
